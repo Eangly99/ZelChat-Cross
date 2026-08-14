@@ -16,7 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Main administrative command for ZelChat-Cross (/zelcross).
+ * Main command for ZelChat-Cross (/zelcross) handling administrative tasks and showcase inspection.
  */
 public final class ZelCrossCommand implements CommandExecutor, TabCompleter {
 
@@ -29,6 +29,11 @@ public final class ZelCrossCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("info") || args[0].equalsIgnoreCase("status")) {
+            if (!sender.hasPermission("zelcross.admin")) {
+                sender.sendMessage(plugin.getConfigManager().parse("<gradient:#00ff87:#60efff><bold>ZelChat-Cross</bold></gradient> <gray>v"
+                        + plugin.getPluginMeta().getVersion() + "</gray>"));
+                return true;
+            }
             sendInfo(sender);
             return true;
         }
@@ -113,7 +118,11 @@ public final class ZelCrossCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             default -> {
-                sender.sendMessage(plugin.getConfigManager().parse("<red>Unknown subcommand. Use /" + label + " [reload|debug|info|servers|viewinv|viewec]</red>"));
+                if (sender.hasPermission("zelcross.admin")) {
+                    sender.sendMessage(plugin.getConfigManager().parse("<red>Unknown subcommand. Use /" + label + " [reload|debug|info|servers|viewinv|viewec|viewitem]</red>"));
+                } else {
+                    sender.sendMessage(plugin.getConfigManager().parse("<red>Unknown subcommand.</red>"));
+                }
                 return true;
             }
         }
@@ -156,7 +165,9 @@ public final class ZelCrossCommand implements CommandExecutor, TabCompleter {
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
             List<String> completions = new ArrayList<>();
-            List<String> subs = List.of("info", "reload", "debug", "servers", "viewinv", "viewec", "viewitem");
+            List<String> subs = sender.hasPermission("zelcross.admin") ?
+                    List.of("info", "reload", "debug", "servers", "viewinv", "viewec", "viewitem") :
+                    List.of("viewinv", "viewec", "viewitem");
             for (String sub : subs) {
                 if (sub.startsWith(args[0].toLowerCase(Locale.ROOT))) {
                     completions.add(sub);

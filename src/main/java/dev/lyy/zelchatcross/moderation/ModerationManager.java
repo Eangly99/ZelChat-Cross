@@ -9,6 +9,7 @@ import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import redis.clients.jedis.Jedis;
 
 import java.util.Locale;
 import java.util.Map;
@@ -16,6 +17,7 @@ import java.util.logging.Level;
 
 /**
  * Handles network-wide moderation actions (global mute, broadcasts, clear chat).
+ * Persists network mute state across server restarts via Redis.
  */
 public final class ModerationManager {
 
@@ -24,6 +26,26 @@ public final class ModerationManager {
 
     public ModerationManager(ZelChatCross plugin) {
         this.plugin = plugin;
+        initPersistedState();
+    }
+
+    private void initPersistedState() {
+        plugin.getScheduler().runAsync(() -> {
+            try {
+                if (plugin.getRedisManager().isConnected()) {
+                    try (Jedis jedis = plugin.getRedisManager().getResource()) {
+                        String key = plugin.getConfigManager().getRedisChannelPrefix() + ":chat_muted";
+                        String val = jedis.get(key);
+                        if ("true".equalsIgnoreCase(val)) {
+                            this.globalChatMuted = true;
+                            syncLocalZelChatMute(true);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.FINE, "[Moderation] Could not fetch initial mute state from Redis: " + e.getMessage());
+            }
+        });
     }
 
     public boolean isChatMuted() {
@@ -36,6 +58,20 @@ public final class ModerationManager {
 
         // Sync with local ZelChat API
         syncLocalZelChatMute(muted);
+
+        // Persist to Redis key
+        plugin.getScheduler().runAsync(() -> {
+            try {
+                if (plugin.getRedisManager().isConnected()) {
+                    try (Jedis jedis = plugin.getRedisManager().getResource()) {
+                        String key = plugin.getConfigManager().getRedisChannelPrefix() + ":chat_muted";
+                        jedis.set(key, String.valueOf(muted));
+                    }
+                }
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.FINE, "[Moderation] Error persisting mute state to Redis: " + e.getMessage());
+            }
+        });
 
         ModerationPayload payload = new ModerationPayload(
                 serverId,

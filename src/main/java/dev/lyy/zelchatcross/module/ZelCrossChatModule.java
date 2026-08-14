@@ -72,8 +72,12 @@ public final class ZelCrossChatModule implements ChatModule {
             }
         }
 
+        // Sanitize raw message if player lacks MiniMessage formatting permission
+        String sanitized = player.hasPermission("zelcross.chat.format") ? rawMessage :
+                MiniMessage.miniMessage().escapeTags(rawMessage);
+
         // Process showcase placeholders [item], [inv], [ec]
-        String processedRaw = plugin.getShowcaseManager().processChatShowcases(player, rawMessage);
+        String processedRaw = plugin.getShowcaseManager().processChatShowcases(player, sanitized);
         if (!processedRaw.equals(rawMessage)) {
             Component transformed = plugin.getConfigManager().parse(processedRaw);
             chatMessage.setMessage(transformed);

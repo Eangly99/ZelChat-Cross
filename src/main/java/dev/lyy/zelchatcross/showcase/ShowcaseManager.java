@@ -310,12 +310,25 @@ public final class ShowcaseManager {
     }
 
     public void openSnapshotGui(Player player, String snapshotId) {
-        ShowcaseSnapshot snapshot = getSnapshot(snapshotId);
-        if (snapshot == null || snapshot.isExpired()) {
-            player.sendMessage(plugin.getConfigManager().getMessage("showcase-not-found"));
+        ShowcaseSnapshot cached = snapshotCache.get(snapshotId);
+        if (cached != null && !cached.isExpired()) {
+            guiManager.openSnapshot(player, cached);
             return;
         }
-        guiManager.openSnapshot(player, snapshot);
+
+        // Asynchronous lookup to prevent blocking main / Folia region tick thread
+        plugin.getScheduler().runAsync(() -> {
+            ShowcaseSnapshot snapshot = getSnapshot(snapshotId);
+            if (snapshot == null || snapshot.isExpired()) {
+                plugin.getScheduler().runEntity(player, () -> {
+                    player.sendMessage(plugin.getConfigManager().getMessage("showcase-not-found"));
+                });
+                return;
+            }
+            plugin.getScheduler().runEntity(player, () -> {
+                guiManager.openSnapshot(player, snapshot);
+            });
+        });
     }
 
     private void cleanupExpiredSnapshots() {

@@ -11,10 +11,9 @@ softdepend:
 
 commands:
   zelcross:
-    description: Main admin command for ZelChat-Cross.
-    permission: zelcross.admin
+    description: Main command for ZelChat-Cross and showcase viewing.
     aliases: [zelchatcross, zcross]
-    usage: /<command> [reload|debug|info|servers|viewinv|viewec]
+    usage: /<command> [reload|debug|info|servers|viewinv|viewec|viewitem]
   msg:
     description: Send a private message to a player across the network.
     permission: zelcross.msg

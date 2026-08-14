@@ -14,7 +14,7 @@ import java.util.logging.Level;
 
 /**
  * Manages distributed player presence caching across all servers.
- * Features zero-allocation player name tab-completion for high concurrency.
+ * Features zero-allocation player name tab-completion and cross-server switch consistency.
  */
 public final class NetworkPresenceManager {
 
@@ -35,6 +35,12 @@ public final class NetworkPresenceManager {
 
     public void start() {
         int interval = plugin.getConfigManager().getPresenceHeartbeatInterval();
+
+        String serverId = plugin.getConfigManager().getServerId();
+        String serverDisplay = plugin.getConfigManager().getServerDisplayName();
+        serverDisplayNames.put(serverId, serverDisplay);
+        serverHeartbeats.put(serverId, System.currentTimeMillis());
+        playersByServer.computeIfAbsent(serverId, k -> ConcurrentHashMap.newKeySet());
 
         // Register initial local players
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -185,6 +191,14 @@ public final class NetworkPresenceManager {
 
     public void handleIncomingPresence(PresencePayload payload) {
         String originServer = payload.getOriginServerId();
+        String localServer = plugin.getConfigManager().getServerId();
+
+        if (originServer.equalsIgnoreCase(localServer)) {
+            plugin.getLogger().warning("[Presence] WARNING: Detected another server sending presence with identical server-id '"
+                    + localServer + "'. Please configure a unique server-id in config.yml for each server!");
+            return;
+        }
+
         String serverDisplay = payload.getServerDisplayName() != null ? payload.getServerDisplayName() : originServer;
         serverDisplayNames.put(originServer, serverDisplay);
         serverHeartbeats.put(originServer, System.currentTimeMillis());
@@ -192,28 +206,39 @@ public final class NetworkPresenceManager {
         switch (payload.getType()) {
             case PLAYER_JOIN -> {
                 if (payload.getSinglePlayerUuid() != null && payload.getSinglePlayerName() != null) {
+                    UUID uuid = payload.getSinglePlayerUuid();
+                    // Remove from all other server buckets to handle server switches
+                    for (Map.Entry<String, Set<UUID>> entry : playersByServer.entrySet()) {
+                        if (!entry.getKey().equals(originServer)) {
+                            entry.getValue().remove(uuid);
+                        }
+                    }
+
                     NetworkPlayer netPlayer = new NetworkPlayer(
-                            payload.getSinglePlayerUuid(),
+                            uuid,
                             payload.getSinglePlayerName(),
                             originServer,
                             serverDisplay
                     );
-                    playersByUuid.put(payload.getSinglePlayerUuid(), netPlayer);
-                    uuidByName.put(payload.getSinglePlayerName().toLowerCase(Locale.ROOT), payload.getSinglePlayerUuid());
-                    playersByServer.computeIfAbsent(originServer, k -> ConcurrentHashMap.newKeySet())
-                            .add(payload.getSinglePlayerUuid());
+                    playersByUuid.put(uuid, netPlayer);
+                    uuidByName.put(payload.getSinglePlayerName().toLowerCase(Locale.ROOT), uuid);
+                    playersByServer.computeIfAbsent(originServer, k -> ConcurrentHashMap.newKeySet()).add(uuid);
                     updateCachedPlayerNames();
                 }
             }
             case PLAYER_QUIT -> {
                 if (payload.getSinglePlayerUuid() != null) {
-                    playersByUuid.remove(payload.getSinglePlayerUuid());
-                    if (payload.getSinglePlayerName() != null) {
-                        uuidByName.remove(payload.getSinglePlayerName().toLowerCase(Locale.ROOT));
+                    UUID uuid = payload.getSinglePlayerUuid();
+                    NetworkPlayer current = playersByUuid.get(uuid);
+                    if (current != null && current.getServerId().equals(originServer)) {
+                        playersByUuid.remove(uuid);
+                        if (payload.getSinglePlayerName() != null) {
+                            uuidByName.remove(payload.getSinglePlayerName().toLowerCase(Locale.ROOT));
+                        }
                     }
                     Set<UUID> set = playersByServer.get(originServer);
                     if (set != null) {
-                        set.remove(payload.getSinglePlayerUuid());
+                        set.remove(uuid);
                     }
                     updateCachedPlayerNames();
                 }
@@ -222,7 +247,7 @@ public final class NetworkPresenceManager {
                 Map<UUID, String> remotePlayers = payload.getOnlinePlayers();
                 Set<UUID> currentServerUuids = playersByServer.computeIfAbsent(originServer, k -> ConcurrentHashMap.newKeySet());
 
-                // Remove players no longer present on that server
+                // Remove players no longer present on that server only if their current registered server is originServer
                 Set<UUID> toRemove = new HashSet<>();
                 for (UUID u : currentServerUuids) {
                     if (remotePlayers == null || !remotePlayers.containsKey(u)) {
@@ -230,11 +255,12 @@ public final class NetworkPresenceManager {
                     }
                 }
                 for (UUID u : toRemove) {
-                    NetworkPlayer removed = playersByUuid.remove(u);
-                    if (removed != null) {
-                        uuidByName.remove(removed.getUsername().toLowerCase(Locale.ROOT));
+                    NetworkPlayer current = playersByUuid.get(u);
+                    if (current != null && current.getServerId().equals(originServer)) {
+                        playersByUuid.remove(u);
+                        uuidByName.remove(current.getUsername().toLowerCase(Locale.ROOT));
+                        currentServerUuids.remove(u);
                     }
-                    currentServerUuids.remove(u);
                 }
 
                 // Add or update current players
@@ -293,9 +319,10 @@ public final class NetworkPresenceManager {
         Set<UUID> players = playersByServer.remove(serverId);
         if (players != null) {
             for (UUID uuid : players) {
-                NetworkPlayer removed = playersByUuid.remove(uuid);
-                if (removed != null) {
-                    uuidByName.remove(removed.getUsername().toLowerCase(Locale.ROOT));
+                NetworkPlayer current = playersByUuid.get(uuid);
+                if (current != null && current.getServerId().equals(serverId)) {
+                    playersByUuid.remove(uuid);
+                    uuidByName.remove(current.getUsername().toLowerCase(Locale.ROOT));
                 }
             }
         }

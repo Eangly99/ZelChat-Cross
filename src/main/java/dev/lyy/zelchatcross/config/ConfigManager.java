@@ -207,7 +207,8 @@ public final class ConfigManager {
         String prefix = messages.getString("prefix", "");
         String text = prefix + raw;
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-            text = text.replace("{" + entry.getKey() + "}", entry.getValue());
+            String safeVal = entry.getValue() != null ? miniMessage.escapeTags(entry.getValue()) : "";
+            text = text.replace("{" + entry.getKey() + "}", safeVal);
         }
         return miniMessage.deserialize(text);
     }

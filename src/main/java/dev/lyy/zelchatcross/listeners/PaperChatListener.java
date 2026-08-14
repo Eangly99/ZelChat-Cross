@@ -3,7 +3,6 @@ package dev.lyy.zelchatcross.listeners;
 import dev.lyy.zelchatcross.ZelChatCross;
 import dev.lyy.zelchatcross.redis.payload.ChatMessagePayload;
 import io.papermc.paper.event.player.AsyncChatEvent;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,6 +15,7 @@ import java.util.List;
 /**
  * Fallback listener capturing standard Paper/Spigot chat events to guarantee network sync
  * when ZelChat module pipeline is not active or passes through to Bukkit.
+ * Folia-safe: dispatches inventory showcase creation to player entity region thread.
  */
 public final class PaperChatListener implements Listener {
 
@@ -58,6 +58,15 @@ public final class PaperChatListener implements Listener {
         // Mark as published so neither listener nor module duplicate it
         plugin.getChatManager().markPublished(player.getUniqueId(), rawMessage);
 
+        if (containsShowcaseToken(rawMessage)) {
+            // Folia-safe entity thread dispatch for inventory snapshot capture
+            plugin.getScheduler().runEntity(player, () -> dispatchChatMessage(player, rawMessage));
+        } else {
+            dispatchChatMessage(player, rawMessage);
+        }
+    }
+
+    private void dispatchChatMessage(Player player, String rawMessage) {
         String sanitized = player.hasPermission("zelcross.chat.format") ? rawMessage :
                 net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().escapeTags(rawMessage);
 
@@ -83,5 +92,18 @@ public final class PaperChatListener implements Listener {
             plugin.getLogger().info("[Debug] Published chat via PaperChatListener from "
                     + player.getName() + " on " + serverId + ": " + rawMessage);
         }
+    }
+
+    private boolean containsShowcaseToken(String message) {
+        for (String placeholder : plugin.getConfigManager().getShowcaseItemPlaceholders()) {
+            if (message.contains(placeholder)) return true;
+        }
+        for (String placeholder : plugin.getConfigManager().getShowcaseInvPlaceholders()) {
+            if (message.contains(placeholder)) return true;
+        }
+        for (String placeholder : plugin.getConfigManager().getShowcaseEcPlaceholders()) {
+            if (message.contains(placeholder)) return true;
+        }
+        return false;
     }
 }
