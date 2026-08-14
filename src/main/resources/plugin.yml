@@ -14,7 +14,7 @@ commands:
     description: Main admin command for ZelChat-Cross.
     permission: zelcross.admin
     aliases: [zelchatcross, zcross]
-    usage: /<command> [reload|info|servers|viewinv|viewec]
+    usage: /<command> [reload|debug|info|servers|viewinv|viewec]
   msg:
     description: Send a private message to a player across the network.
     permission: zelcross.msg
@@ -64,8 +64,14 @@ permissions:
   zelcross.admin.chatmute:
     description: Permission to mute/unmute network chat.
     default: op
+  zelcross.admin.chatmute.bypass:
+    description: Permission to bypass network chat mute.
+    default: op
   zelcross.admin.clearchat:
     description: Permission to clear chat across the network.
+    default: op
+  zelcross.admin.clearchat.bypass:
+    description: Permission to be immune from chat clearing.
     default: op
   zelcross.admin.spy:
     description: Permission to spy on private messages and staff chats.
@@ -79,6 +85,9 @@ permissions:
   zelcross.reply:
     description: Permission to reply to cross-server private messages.
     default: true
+  zelcross.chat.format:
+    description: Permission to use MiniMessage formatting in chat and private messages.
+    default: op
   zelcross.showcase.item:
     description: Permission to showcase items in cross-server chat.
     default: true

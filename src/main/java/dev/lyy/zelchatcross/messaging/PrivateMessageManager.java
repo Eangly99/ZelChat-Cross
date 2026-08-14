@@ -76,8 +76,12 @@ public final class PrivateMessageManager {
             }
         }
 
+        // Sanitize message if player lacks color/format permission
+        String sanitized = sender.hasPermission("zelcross.chat.format") ? message :
+                net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().escapeTags(message);
+
         // Process showcase placeholders in private message as well
-        String processedMessage = plugin.getShowcaseManager().processChatShowcases(sender, message);
+        String processedMessage = plugin.getShowcaseManager().processChatShowcases(sender, sanitized);
 
         String currentServerId = cfg.getServerId();
         String currentServerDisplay = cfg.getServerDisplayName();

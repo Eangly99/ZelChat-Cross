@@ -114,9 +114,10 @@ public final class ShowcaseManager {
             for (String placeholder : cfg.getShowcaseInvPlaceholders()) {
                 if (result.contains(placeholder)) {
                     String snapshotId = createInventorySnapshot(player);
+                    String safePlayerName = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().escapeTags(player.getName());
                     String replacement = cfg.getShowcaseInvFormat()
                             .replace("{snapshot_id}", snapshotId)
-                            .replace("{player}", player.getName());
+                            .replace("{player}", safePlayerName);
                     result = result.replace(placeholder, replacement);
                     usedShowcase = true;
                 }
@@ -128,9 +129,10 @@ public final class ShowcaseManager {
             for (String placeholder : cfg.getShowcaseEcPlaceholders()) {
                 if (result.contains(placeholder)) {
                     String snapshotId = createEnderChestSnapshot(player);
+                    String safePlayerName = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().escapeTags(player.getName());
                     String replacement = cfg.getShowcaseEcFormat()
                             .replace("{snapshot_id}", snapshotId)
-                            .replace("{player}", player.getName());
+                            .replace("{player}", safePlayerName);
                     result = result.replace(placeholder, replacement);
                     usedShowcase = true;
                 }
@@ -145,18 +147,21 @@ public final class ShowcaseManager {
     }
 
     private String getItemDisplayName(ItemStack item) {
+        String raw;
         if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-            return PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName());
-        }
-        String typeName = item.getType().name().replace('_', ' ').toLowerCase(Locale.ROOT);
-        String[] words = typeName.split(" ");
-        StringBuilder sb = new StringBuilder();
-        for (String w : words) {
-            if (!w.isEmpty()) {
-                sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(" ");
+            raw = PlainTextComponentSerializer.plainText().serialize(item.getItemMeta().displayName());
+        } else {
+            String typeName = item.getType().name().replace('_', ' ').toLowerCase(Locale.ROOT);
+            String[] words = typeName.split(" ");
+            StringBuilder sb = new StringBuilder();
+            for (String w : words) {
+                if (!w.isEmpty()) {
+                    sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(" ");
+                }
             }
+            raw = sb.toString().trim();
         }
-        return sb.toString().trim();
+        return net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().escapeTags(raw);
     }
 
     public String createItemSnapshot(Player player, ItemStack item) {

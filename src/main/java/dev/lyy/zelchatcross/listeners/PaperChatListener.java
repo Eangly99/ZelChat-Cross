@@ -58,7 +58,10 @@ public final class PaperChatListener implements Listener {
         // Mark as published so neither listener nor module duplicate it
         plugin.getChatManager().markPublished(player.getUniqueId(), rawMessage);
 
-        String processedRaw = plugin.getShowcaseManager().processChatShowcases(player, rawMessage);
+        String sanitized = player.hasPermission("zelcross.chat.format") ? rawMessage :
+                net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().escapeTags(rawMessage);
+
+        String processedRaw = plugin.getShowcaseManager().processChatShowcases(player, sanitized);
         String serverId = plugin.getConfigManager().getServerId();
         String serverDisplayName = plugin.getConfigManager().getServerDisplayName();
 
