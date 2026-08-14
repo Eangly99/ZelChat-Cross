@@ -7,6 +7,7 @@ import java.util.UUID;
 
 /**
  * In-memory representation of an item, inventory, or enderchest snapshot.
+ * Supports thread-safe lazy deserialization to prevent CPU spikes across servers.
  */
 public final class ShowcaseSnapshot {
 
@@ -15,7 +16,8 @@ public final class ShowcaseSnapshot {
     private final UUID ownerUuid;
     private final String ownerName;
     private final String title;
-    private final ItemStack[] items;
+    private final String serializedData;
+    private volatile ItemStack[] items;
     private final long expiryMillis;
 
     public ShowcaseSnapshot(String snapshotId,
@@ -31,6 +33,24 @@ public final class ShowcaseSnapshot {
         this.ownerName = ownerName;
         this.title = title;
         this.items = items;
+        this.serializedData = null;
+        this.expiryMillis = expiryMillis;
+    }
+
+    public ShowcaseSnapshot(String snapshotId,
+                            ShowcaseSnapshotPayload.Type type,
+                            UUID ownerUuid,
+                            String ownerName,
+                            String title,
+                            String serializedData,
+                            long expiryMillis) {
+        this.snapshotId = snapshotId;
+        this.type = type;
+        this.ownerUuid = ownerUuid;
+        this.ownerName = ownerName;
+        this.title = title;
+        this.items = null;
+        this.serializedData = serializedData;
         this.expiryMillis = expiryMillis;
     }
 
@@ -55,6 +75,18 @@ public final class ShowcaseSnapshot {
     }
 
     public ItemStack[] getItems() {
+        if (items == null && serializedData != null) {
+            synchronized (this) {
+                if (items == null) {
+                    if (type == ShowcaseSnapshotPayload.Type.ITEM) {
+                        ItemStack item = ItemSerializer.fromBase64(serializedData);
+                        this.items = new ItemStack[]{item};
+                    } else {
+                        this.items = ItemSerializer.itemArrayFromBase64(serializedData);
+                    }
+                }
+            }
+        }
         return items;
     }
 

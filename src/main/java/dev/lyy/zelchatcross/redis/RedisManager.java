@@ -111,6 +111,15 @@ public final class RedisManager {
             stopReconnectTask();
         }
 
+        if (publisher != null) {
+            try {
+                publisher.shutdown();
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.FINE, "[Redis] Error shutting down publisher: " + e.getMessage());
+            }
+            publisher = null;
+        }
+
         if (subscriber != null) {
             try {
                 subscriber.stop();

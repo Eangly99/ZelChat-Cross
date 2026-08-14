@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages cross-server private messaging (/msg, /tell, /reply) and SocialSpy.
+ * Optimized for high player counts with targeted spy dispatch and memory cleanup.
  */
 public final class PrivateMessageManager {
 
@@ -40,6 +41,12 @@ public final class PrivateMessageManager {
 
     public boolean isSpyEnabled(Player player) {
         return spyEnabledPlayers.contains(player.getUniqueId());
+    }
+
+    public void onPlayerQuit(UUID uuid) {
+        lastReplierUuid.remove(uuid);
+        lastReplierName.remove(uuid);
+        spyEnabledPlayers.remove(uuid);
     }
 
     public void sendPrivateMessage(Player sender, String targetName, String message) {
@@ -193,8 +200,11 @@ public final class PrivateMessageManager {
     }
 
     private void renderSpyLocally(SocialSpyPayload payload) {
-        ConfigManager cfg = plugin.getConfigManager();
+        if (spyEnabledPlayers.isEmpty()) {
+            return;
+        }
 
+        ConfigManager cfg = plugin.getConfigManager();
         String spyFormat = cfg.getPmFormatSpy()
                 .replace("<sender>", payload.getSenderName())
                 .replace("<sender_server>", payload.getOriginServerId())
@@ -205,13 +215,14 @@ public final class PrivateMessageManager {
 
         Component spyComponent = cfg.parse(spyFormat);
 
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.hasPermission("zelcross.admin.spy") && spyEnabledPlayers.contains(player.getUniqueId())) {
-                // Don't send spy message to the sender or receiver
-                if (!player.getUniqueId().equals(payload.getSenderUuid()) &&
-                        !player.getUniqueId().equals(payload.getTargetUuid())) {
-                    player.sendMessage(spyComponent);
-                }
+        // Targeted iteration: only iterate players who actively have spy enabled
+        for (UUID spyUuid : spyEnabledPlayers) {
+            if (spyUuid.equals(payload.getSenderUuid()) || spyUuid.equals(payload.getTargetUuid())) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(spyUuid);
+            if (player != null && player.isOnline() && player.hasPermission("zelcross.admin.spy")) {
+                player.sendMessage(spyComponent);
             }
         }
     }

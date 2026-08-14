@@ -8,7 +8,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 /**
- * Listens for player join/quit events to update network presence.
+ * Listens for player join/quit events to update network presence and release caches.
  */
 public final class PlayerConnectionListener implements Listener {
 
@@ -26,5 +26,6 @@ public final class PlayerConnectionListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
         plugin.getPresenceManager().onLocalPlayerQuit(event.getPlayer());
+        plugin.getPrivateMessageManager().onPlayerQuit(event.getPlayer().getUniqueId());
     }
 }

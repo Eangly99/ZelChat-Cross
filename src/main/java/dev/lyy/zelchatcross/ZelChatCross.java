@@ -115,12 +115,15 @@ public final class ZelChatCross extends JavaPlugin implements Listener {
         // Unregister ChatModule from ZelChat
         unregisterZelChatModule();
 
-        // Stop Presence and Showcase
+        // Stop Presence, Showcase, and Chat deduplication
         if (presenceManager != null) {
             presenceManager.stop();
         }
         if (showcaseManager != null) {
             showcaseManager.stop();
+        }
+        if (chatManager != null) {
+            chatManager.stop();
         }
 
         // Disconnect Redis

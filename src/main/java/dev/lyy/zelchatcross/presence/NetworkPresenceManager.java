@@ -14,6 +14,7 @@ import java.util.logging.Level;
 
 /**
  * Manages distributed player presence caching across all servers.
+ * Features zero-allocation player name tab-completion for high concurrency.
  */
 public final class NetworkPresenceManager {
 
@@ -24,6 +25,7 @@ public final class NetworkPresenceManager {
     private final Map<String, Long> serverHeartbeats = new ConcurrentHashMap<>();
     private final Map<String, String> serverDisplayNames = new ConcurrentHashMap<>();
 
+    private volatile List<String> cachedPlayerNames = Collections.emptyList();
     private TaskHandle heartbeatTask;
     private TaskHandle cleanupTask;
 
@@ -38,6 +40,7 @@ public final class NetworkPresenceManager {
         for (Player p : Bukkit.getOnlinePlayers()) {
             registerLocalPlayer(p);
         }
+        updateCachedPlayerNames();
 
         // Send initial heartbeat and start recurring task
         sendHeartbeat();
@@ -83,10 +86,12 @@ public final class NetworkPresenceManager {
         uuidByName.clear();
         playersByServer.clear();
         serverHeartbeats.clear();
+        cachedPlayerNames = Collections.emptyList();
     }
 
     public void onLocalPlayerJoin(Player player) {
         registerLocalPlayer(player);
+        updateCachedPlayerNames();
 
         String serverId = plugin.getConfigManager().getServerId();
         String serverDisplay = plugin.getConfigManager().getServerDisplayName();
@@ -104,6 +109,7 @@ public final class NetworkPresenceManager {
 
     public void onLocalPlayerQuit(Player player) {
         unregisterLocalPlayer(player.getUniqueId(), player.getName());
+        updateCachedPlayerNames();
 
         String serverId = plugin.getConfigManager().getServerId();
         String serverDisplay = plugin.getConfigManager().getServerDisplayName();
@@ -196,6 +202,7 @@ public final class NetworkPresenceManager {
                     uuidByName.put(payload.getSinglePlayerName().toLowerCase(Locale.ROOT), payload.getSinglePlayerUuid());
                     playersByServer.computeIfAbsent(originServer, k -> ConcurrentHashMap.newKeySet())
                             .add(payload.getSinglePlayerUuid());
+                    updateCachedPlayerNames();
                 }
             }
             case PLAYER_QUIT -> {
@@ -208,6 +215,7 @@ public final class NetworkPresenceManager {
                     if (set != null) {
                         set.remove(payload.getSinglePlayerUuid());
                     }
+                    updateCachedPlayerNames();
                 }
             }
             case SERVER_HEARTBEAT -> {
@@ -240,11 +248,21 @@ public final class NetworkPresenceManager {
                         currentServerUuids.add(uuid);
                     }
                 }
+                updateCachedPlayerNames();
             }
             case SERVER_STOP -> {
                 removeServer(originServer);
+                updateCachedPlayerNames();
             }
         }
+    }
+
+    private void updateCachedPlayerNames() {
+        List<String> names = new ArrayList<>(playersByUuid.size());
+        for (NetworkPlayer np : playersByUuid.values()) {
+            names.add(np.getUsername());
+        }
+        this.cachedPlayerNames = Collections.unmodifiableList(names);
     }
 
     private void cleanupDeadServers() {
@@ -260,9 +278,12 @@ public final class NetworkPresenceManager {
             }
         }
 
-        for (String deadServer : deadServers) {
-            plugin.getLogger().warning("[Presence] Server '" + deadServer + "' timed out. Removing cached players.");
-            removeServer(deadServer);
+        if (!deadServers.isEmpty()) {
+            for (String deadServer : deadServers) {
+                plugin.getLogger().warning("[Presence] Server '" + deadServer + "' timed out. Removing cached players.");
+                removeServer(deadServer);
+            }
+            updateCachedPlayerNames();
         }
     }
 
@@ -297,11 +318,7 @@ public final class NetworkPresenceManager {
     }
 
     public List<String> getOnlinePlayerNames() {
-        List<String> names = new ArrayList<>(playersByUuid.size());
-        for (NetworkPlayer np : playersByUuid.values()) {
-            names.add(np.getUsername());
-        }
-        return names;
+        return cachedPlayerNames;
     }
 
     public int getNetworkOnlineCount() {

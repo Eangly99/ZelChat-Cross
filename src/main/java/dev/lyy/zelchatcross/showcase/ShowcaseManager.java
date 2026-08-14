@@ -17,6 +17,7 @@ import java.util.logging.Level;
 
 /**
  * Manages item, inventory, and enderchest showcasing and snapshot distribution.
+ * Implements lazy item deserialization to preserve CPU and memory at scale.
  */
 public final class ShowcaseManager {
 
@@ -265,21 +266,14 @@ public final class ShowcaseManager {
     }
 
     public void handleIncomingSnapshot(ShowcaseSnapshotPayload payload) {
-        ItemStack[] items;
-        if (payload.getType() == ShowcaseSnapshotPayload.Type.ITEM) {
-            ItemStack item = ItemSerializer.fromBase64(payload.getSerializedData());
-            items = new ItemStack[]{item};
-        } else {
-            items = ItemSerializer.itemArrayFromBase64(payload.getSerializedData());
-        }
-
+        // Lazy deserialization: do NOT deserialize 41 items unless someone views it
         ShowcaseSnapshot snapshot = new ShowcaseSnapshot(
                 payload.getSnapshotId(),
                 payload.getType(),
                 payload.getOwnerUuid(),
                 payload.getOwnerName(),
                 payload.getTitle(),
-                items,
+                payload.getSerializedData(),
                 payload.getExpiryMillis()
         );
         snapshotCache.put(snapshot.getSnapshotId(), snapshot);

@@ -4,26 +4,43 @@ import dev.lyy.zelchatcross.ZelChatCross;
 import dev.lyy.zelchatcross.config.ConfigManager;
 import dev.lyy.zelchatcross.redis.payload.ChatMessagePayload;
 import dev.lyy.zelchatcross.redis.payload.StaffChatPayload;
+import dev.lyy.zelchatcross.scheduler.TaskHandle;
 import it.pino.zelchat.api.ZelChatAPI;
 import it.pino.zelchat.api.player.ChatPlayer;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Handles incoming cross-server chat messages and distributes them locally.
+ * Handles incoming cross-server chat messages and distributes them locally with high-performance
+ * audience dispatching and sliding-window deduplication.
  */
 public final class CrossChatManager {
 
     private final ZelChatCross plugin;
     private final Map<String, Long> recentlyPublished = new ConcurrentHashMap<>();
+    private TaskHandle cleanupTask;
 
     public CrossChatManager(ZelChatCross plugin) {
         this.plugin = plugin;
+        this.cleanupTask = plugin.getScheduler().runAsyncRepeating(
+                this::cleanupDeduplicationCache,
+                30,
+                30,
+                TimeUnit.SECONDS
+        );
+    }
+
+    public void stop() {
+        if (cleanupTask != null) {
+            cleanupTask.cancel();
+            cleanupTask = null;
+        }
+        recentlyPublished.clear();
     }
 
     public void markPublished(UUID playerUuid, String message) {
@@ -41,6 +58,11 @@ public final class CrossChatManager {
             return false;
         }
         return true;
+    }
+
+    private void cleanupDeduplicationCache() {
+        long now = System.currentTimeMillis();
+        recentlyPublished.entrySet().removeIf(entry -> now > entry.getValue());
     }
 
     /**
@@ -66,23 +88,36 @@ public final class CrossChatManager {
         Component bodyComponent = cfg.parse(payload.getMiniMessageContent());
         Component finalMessage = prefixComponent.append(bodyComponent);
 
-        int deliveredCount = 0;
-        // Distribute to local players while respecting ZelChat ignore lists
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (isIgnoring(player.getUniqueId(), senderUuid)) {
-                continue;
-            }
-            player.sendMessage(finalMessage);
-            deliveredCount++;
+        Collection<? extends Player> online = Bukkit.getOnlinePlayers();
+        if (online.isEmpty()) {
+            Bukkit.getConsoleSender().sendMessage(finalMessage);
+            return;
         }
 
-        // Also log to console
+        // Fast-path: Check if any local players are ignoring this sender
+        Set<UUID> ignoringPlayers = getIgnoringPlayers(senderUuid, online);
+
+        if (ignoringPlayers.isEmpty()) {
+            // Direct audience broadcast - avoids per-player map lookups
+            for (Player player : online) {
+                player.sendMessage(finalMessage);
+            }
+        } else {
+            // Filtered delivery for players who are not ignoring
+            for (Player player : online) {
+                if (!ignoringPlayers.contains(player.getUniqueId())) {
+                    player.sendMessage(finalMessage);
+                }
+            }
+        }
+
+        // Log to console
         Bukkit.getConsoleSender().sendMessage(finalMessage);
 
         if (cfg.isDebug()) {
             plugin.getLogger().info("[Debug] Delivered cross-server chat from "
                     + payload.getSenderName() + "@" + payload.getOriginServerId()
-                    + " to " + deliveredCount + " local players.");
+                    + " to " + (online.size() - ignoringPlayers.size()) + " local players.");
         }
     }
 
@@ -120,18 +155,21 @@ public final class CrossChatManager {
         }
     }
 
-    /**
-     * Checks if a local player is ignoring the sender via ZelChat API.
-     */
-    public boolean isIgnoring(UUID localPlayerUuid, UUID senderUuid) {
+    private Set<UUID> getIgnoringPlayers(UUID senderUuid, Collection<? extends Player> online) {
+        if (senderUuid == null) return Collections.emptySet();
+        Set<UUID> ignoring = null;
         try {
             if (ZelChatAPI.get() != null && ZelChatAPI.get().getPlayerService() != null) {
-                ChatPlayer chatPlayer = ZelChatAPI.get().getPlayerService().getOnlinePlayers().get(localPlayerUuid);
-                if (chatPlayer != null && chatPlayer.getHiddenPlayers() != null) {
-                    return chatPlayer.getHiddenPlayers().contains(senderUuid);
+                Map<UUID, ChatPlayer> map = ZelChatAPI.get().getPlayerService().getOnlinePlayers();
+                for (Player player : online) {
+                    ChatPlayer chatPlayer = map.get(player.getUniqueId());
+                    if (chatPlayer != null && chatPlayer.getHiddenPlayers() != null && chatPlayer.getHiddenPlayers().contains(senderUuid)) {
+                        if (ignoring == null) ignoring = new HashSet<>();
+                        ignoring.add(player.getUniqueId());
+                    }
                 }
             }
         } catch (Exception ignored) {}
-        return false;
+        return ignoring != null ? ignoring : Collections.emptySet();
     }
 }
