@@ -57,7 +57,7 @@ public final class RedisSubscriber {
             while (running) {
                 try {
                     String[] channels = redisManager.getChannels().allChannels();
-                    plugin.getLogger().info("[Redis] Starting Pub/Sub subscription loop...");
+                    plugin.getLogger().info("[Redis] Starting Pub/Sub subscription loop for channels: " + String.join(", ", channels));
                     try (Jedis jedis = redisManager.getResource()) {
                         backoffSeconds = 1; // Reset backoff on successful connection
                         jedis.subscribe(pubSub, channels);
@@ -100,43 +100,54 @@ public final class RedisSubscriber {
 
         if (channel.equals(rc.chat())) {
             ChatMessagePayload payload = ChatMessagePayload.fromJson(message);
-            if (payload == null || currentServerId.equals(payload.getOriginServerId())) {
+            if (payload == null) return;
+
+            if (currentServerId.equalsIgnoreCase(payload.getOriginServerId())) {
+                if (plugin.getConfigManager().isDebug()) {
+                    plugin.getLogger().info("[Debug] Dropped incoming chat from " + payload.getOriginServerId()
+                            + " (matches local server-id '" + currentServerId + "')");
+                }
                 return; // Local echo prevention
+            }
+
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("[Debug] Received chat payload from origin: "
+                        + payload.getOriginServerId() + " for player " + payload.getSenderName());
             }
             plugin.getChatManager().handleIncomingChat(payload);
         } else if (channel.equals(rc.privateMessage())) {
             PrivateMessagePayload payload = PrivateMessagePayload.fromJson(message);
-            if (payload == null || currentServerId.equals(payload.getOriginServerId())) {
+            if (payload == null || currentServerId.equalsIgnoreCase(payload.getOriginServerId())) {
                 return; // Local echo prevention
             }
             plugin.getPrivateMessageManager().handleIncomingPrivateMessage(payload);
         } else if (channel.equals(rc.presence())) {
             PresencePayload payload = PresencePayload.fromJson(message);
-            if (payload == null || currentServerId.equals(payload.getOriginServerId())) {
+            if (payload == null || currentServerId.equalsIgnoreCase(payload.getOriginServerId())) {
                 return; // Local echo prevention
             }
             plugin.getPresenceManager().handleIncomingPresence(payload);
         } else if (channel.equals(rc.moderation())) {
             ModerationPayload payload = ModerationPayload.fromJson(message);
-            if (payload == null || currentServerId.equals(payload.getOriginServerId())) {
+            if (payload == null || currentServerId.equalsIgnoreCase(payload.getOriginServerId())) {
                 return; // Local echo prevention
             }
             plugin.getModerationManager().handleIncomingModeration(payload);
         } else if (channel.equals(rc.showcase())) {
             ShowcaseSnapshotPayload payload = ShowcaseSnapshotPayload.fromJson(message);
-            if (payload == null || currentServerId.equals(payload.getOriginServerId())) {
+            if (payload == null || currentServerId.equalsIgnoreCase(payload.getOriginServerId())) {
                 return; // Local echo prevention
             }
             plugin.getShowcaseManager().handleIncomingSnapshot(payload);
         } else if (channel.equals(rc.staffChat())) {
             StaffChatPayload payload = StaffChatPayload.fromJson(message);
-            if (payload == null || currentServerId.equals(payload.getOriginServerId())) {
+            if (payload == null || currentServerId.equalsIgnoreCase(payload.getOriginServerId())) {
                 return; // Local echo prevention
             }
             plugin.getChatManager().handleIncomingStaffChat(payload);
         } else if (channel.equals(rc.spy())) {
             SocialSpyPayload payload = SocialSpyPayload.fromJson(message);
-            if (payload == null || currentServerId.equals(payload.getOriginServerId())) {
+            if (payload == null || currentServerId.equalsIgnoreCase(payload.getOriginServerId())) {
                 return; // Local echo prevention
             }
             plugin.getPrivateMessageManager().handleIncomingSpyMessage(payload);

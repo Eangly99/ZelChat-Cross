@@ -10,7 +10,9 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles incoming cross-server chat messages and distributes them locally.
@@ -18,9 +20,27 @@ import java.util.UUID;
 public final class CrossChatManager {
 
     private final ZelChatCross plugin;
+    private final Map<String, Long> recentlyPublished = new ConcurrentHashMap<>();
 
     public CrossChatManager(ZelChatCross plugin) {
         this.plugin = plugin;
+    }
+
+    public void markPublished(UUID playerUuid, String message) {
+        if (playerUuid != null && message != null) {
+            recentlyPublished.put(playerUuid + ":" + message.trim(), System.currentTimeMillis() + 1500L);
+        }
+    }
+
+    public boolean isRecentlyPublished(UUID playerUuid, String message) {
+        if (playerUuid == null || message == null) return false;
+        Long expiry = recentlyPublished.get(playerUuid + ":" + message.trim());
+        if (expiry == null) return false;
+        if (System.currentTimeMillis() > expiry) {
+            recentlyPublished.remove(playerUuid + ":" + message.trim());
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -46,16 +66,24 @@ public final class CrossChatManager {
         Component bodyComponent = cfg.parse(payload.getMiniMessageContent());
         Component finalMessage = prefixComponent.append(bodyComponent);
 
+        int deliveredCount = 0;
         // Distribute to local players while respecting ZelChat ignore lists
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (isIgnoring(player.getUniqueId(), senderUuid)) {
                 continue;
             }
             player.sendMessage(finalMessage);
+            deliveredCount++;
         }
 
         // Also log to console
         Bukkit.getConsoleSender().sendMessage(finalMessage);
+
+        if (cfg.isDebug()) {
+            plugin.getLogger().info("[Debug] Delivered cross-server chat from "
+                    + payload.getSenderName() + "@" + payload.getOriginServerId()
+                    + " to " + deliveredCount + " local players.");
+        }
     }
 
     /**
@@ -85,6 +113,11 @@ public final class CrossChatManager {
             }
         }
         Bukkit.getConsoleSender().sendMessage(finalMessage);
+
+        if (cfg.isDebug()) {
+            plugin.getLogger().info("[Debug] Delivered cross-server staff chat from "
+                    + payload.getSenderName() + "@" + payload.getOriginServerId());
+        }
     }
 
     /**

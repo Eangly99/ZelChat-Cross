@@ -8,14 +8,12 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 
 /**
  * Manages plugin configuration files (config.yml, messages.yml) and MiniMessage deserialization.
@@ -29,6 +27,7 @@ public final class ConfigManager {
     private FileConfiguration messages;
 
     // Cached Config Values
+    private boolean debug;
     private String serverId;
     private String serverDisplayName;
     private String redisHost;
@@ -107,6 +106,7 @@ public final class ConfigManager {
         }
 
         // Cache all config parameters
+        this.debug = config.getBoolean("debug", false);
         this.serverId = config.getString("server-id", "server-1");
         this.serverDisplayName = config.getString("server-display-name", "<yellow>" + serverId + "</yellow>");
 
@@ -124,7 +124,7 @@ public final class ConfigManager {
 
         this.syncPublic = config.getBoolean("channels.sync-public", true);
         this.syncStaff = config.getBoolean("channels.sync-staff", true);
-        this.publicIncomingPrefix = config.getString("channels.public-incoming-prefix", "<dark_gray>[<aqua><origin_server_display></aqua>]</dark_gray> ");
+        this.publicIncomingPrefix = config.getString("channels.public-incoming-prefix", "<dark_gray>[<aqua><origin_server_display></aqua>]</dark_gray> <gray><sender></gray><dark_gray>:</dark_gray> ");
         this.staffIncomingPrefix = config.getString("channels.staff-incoming-prefix", "<red>[STAFF]</red> <dark_gray>[<yellow><origin_server_display></yellow>]</dark_gray> ");
 
         this.showcaseEnabled = config.getBoolean("showcase.enabled", true);
@@ -151,19 +151,19 @@ public final class ConfigManager {
         this.showcaseEcTtlSeconds = config.getInt("showcase.enderchest.snapshot-ttl-seconds", 300);
 
         this.pmEnabled = config.getBoolean("private-messaging.enabled", true);
-        this.pmFormatSend = config.getString("private-messaging.format-send", "<gray>[<gold>You</gold> -> <aqua><target></aqua>]</gray> <white><message></white>");
-        this.pmFormatReceive = config.getString("private-messaging.format-receive", "<gray>[<aqua><sender></aqua> -> <gold>You</gold>]</gray> <white><message></white>");
-        this.pmFormatSpy = config.getString("private-messaging.format-spy", "<dark_gray>[SPY]</dark_gray> <gray>[<aqua><sender></aqua> -> <gold><target></gold>]</gray> <white><message></white>");
+        this.pmFormatSend = config.getString("private-messaging.format-send", "<gray>[<gold>You</gold> <dark_gray>→</dark_gray> <aqua><target></aqua> <dark_gray>(<yellow><target_server_display></yellow>)</dark_gray>]</gray> <white><message></white>");
+        this.pmFormatReceive = config.getString("private-messaging.format-receive", "<gray>[<aqua><sender></aqua> <dark_gray>(<yellow><sender_server_display></yellow>)</dark_gray> <dark_gray>→</dark_gray> <gold>You</gold>]</gray> <white><message></white>");
+        this.pmFormatSpy = config.getString("private-messaging.format-spy", "<dark_gray>[SPY]</dark_gray> <gray>[<aqua><sender></aqua> <dark_gray>(<yellow><sender_server_display></yellow>)</dark_gray> <dark_gray>→</dark_gray> <gold><target></gold> <dark_gray>(<yellow><target_server_display></yellow>)</dark_gray>]</gray> <white><message></white>");
 
         this.presenceHeartbeatInterval = config.getInt("presence.heartbeat-interval-seconds", 10);
         this.presenceServerTimeout = config.getInt("presence.server-timeout-seconds", 30);
         this.presenceTabComplete = config.getBoolean("presence.enable-network-tab-complete", true);
 
-        this.broadcastPrefix = config.getString("moderation.broadcast-prefix", "<red><bold>BROADCAST</bold></red> ");
+        this.broadcastPrefix = config.getString("moderation.broadcast-prefix", "<gradient:#ff512f:#dd2476><bold>NETWORK BROADCAST</bold></gradient> <dark_gray>»</dark_gray> ");
         this.broadcastSound = config.getString("moderation.broadcast-sound", "ENTITY_PLAYER_LEVELUP");
         this.broadcastSoundVolume = (float) config.getDouble("moderation.broadcast-sound-volume", 1.0);
         this.broadcastSoundPitch = (float) config.getDouble("moderation.broadcast-sound-pitch", 1.0);
-        this.staffChatPrefix = config.getString("moderation.staffchat-prefix", "<red>[STAFF]</red> <aqua><sender></aqua>: ");
+        this.staffChatPrefix = config.getString("moderation.staffchat-prefix", "<red>[STAFF]</red> <dark_gray>[<yellow><origin_server_display></yellow>]</dark_gray> <aqua><sender></aqua><dark_gray>:</dark_gray> ");
     }
 
     private void saveDefaultResource(String resourceName) {
@@ -216,7 +216,10 @@ public final class ConfigManager {
         return messages.getStringList(key);
     }
 
-    // Getters
+    // Getters & Setters
+    public boolean isDebug() { return debug; }
+    public void setDebug(boolean debug) { this.debug = debug; }
+
     public String getServerId() { return serverId; }
     public String getServerDisplayName() { return serverDisplayName; }
     public String getRedisHost() { return redisHost; }

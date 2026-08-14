@@ -11,7 +11,6 @@ import it.pino.zelchat.api.module.annotation.ChatModuleSettings;
 import it.pino.zelchat.api.module.priority.ModulePriority;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -80,6 +79,9 @@ public final class ZelCrossChatModule implements ChatModule {
             chatMessage.setMessage(transformed);
         }
 
+        // Mark as published so PaperChatListener doesn't duplicate
+        plugin.getChatManager().markPublished(player.getUniqueId(), rawMessage);
+
         // Distribute to network via Redis Pub/Sub
         ChannelType type = chatMessage.getChannel().getType();
         String serverId = plugin.getConfigManager().getServerId();
@@ -100,6 +102,11 @@ public final class ZelCrossChatModule implements ChatModule {
                     chatMessage.getMentions()
             );
             plugin.getRedisManager().getPublisher().publishChat(payload);
+
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("[Debug] Published chat via ZelCrossChatModule from "
+                        + player.getName() + " on " + serverId + ": " + rawMessage);
+            }
         } else if (type == ChannelType.STAFF && plugin.getConfigManager().isSyncStaff()) {
             String miniMessageSerialized = MiniMessage.miniMessage().serialize(chatMessage.getMessage());
 
@@ -111,6 +118,11 @@ public final class ZelCrossChatModule implements ChatModule {
                     miniMessageSerialized
             );
             plugin.getRedisManager().getPublisher().publishStaffChat(payload);
+
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("[Debug] Published staff chat via ZelCrossChatModule from "
+                        + player.getName() + " on " + serverId);
+            }
         }
     }
 

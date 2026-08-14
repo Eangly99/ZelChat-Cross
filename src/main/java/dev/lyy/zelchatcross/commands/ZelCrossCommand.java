@@ -45,6 +45,17 @@ public final class ZelCrossCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(plugin.getConfigManager().getMessage("reload-success"));
                 return true;
             }
+            case "debug" -> {
+                if (!sender.hasPermission("zelcross.admin")) {
+                    sender.sendMessage(plugin.getConfigManager().getMessage("no-permission"));
+                    return true;
+                }
+                boolean current = plugin.getConfigManager().isDebug();
+                plugin.getConfigManager().setDebug(!current);
+                sender.sendMessage(plugin.getConfigManager().parse("<green>ZelCross verbose debug mode is now <bold>"
+                        + (!current ? "ENABLED" : "DISABLED") + "</bold>.</green>"));
+                return true;
+            }
             case "servers", "list" -> {
                 if (!sender.hasPermission("zelcross.admin")) {
                     sender.sendMessage(plugin.getConfigManager().getMessage("no-permission"));
@@ -102,7 +113,7 @@ public final class ZelCrossCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             default -> {
-                sender.sendMessage(plugin.getConfigManager().parse("<red>Unknown subcommand. Use /" + label + " [reload|info|servers|viewinv|viewec]</red>"));
+                sender.sendMessage(plugin.getConfigManager().parse("<red>Unknown subcommand. Use /" + label + " [reload|debug|info|servers|viewinv|viewec]</red>"));
                 return true;
             }
         }
@@ -145,7 +156,7 @@ public final class ZelCrossCommand implements CommandExecutor, TabCompleter {
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
             List<String> completions = new ArrayList<>();
-            List<String> subs = List.of("info", "reload", "servers", "viewinv", "viewec", "viewitem");
+            List<String> subs = List.of("info", "reload", "debug", "servers", "viewinv", "viewec", "viewitem");
             for (String sub : subs) {
                 if (sub.startsWith(args[0].toLowerCase(Locale.ROOT))) {
                     completions.add(sub);

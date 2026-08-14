@@ -4,6 +4,7 @@ import dev.lyy.zelchatcross.chat.CrossChatManager;
 import dev.lyy.zelchatcross.commands.*;
 import dev.lyy.zelchatcross.config.ConfigManager;
 import dev.lyy.zelchatcross.hook.ZelCrossExpansion;
+import dev.lyy.zelchatcross.listeners.PaperChatListener;
 import dev.lyy.zelchatcross.listeners.PlayerConnectionListener;
 import dev.lyy.zelchatcross.listeners.ShowcaseInventoryListener;
 import dev.lyy.zelchatcross.messaging.PrivateMessageManager;
@@ -16,6 +17,9 @@ import dev.lyy.zelchatcross.showcase.ShowcaseManager;
 import it.pino.zelchat.api.ZelChatAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.concurrent.TimeUnit;
@@ -25,7 +29,7 @@ import java.util.logging.Level;
  * Main plugin class for ZelChat-Cross (ZelCross).
  * Enterprise-grade Redis/DragonflyDB cross-server communication expansion for ZelChat on Paper and Folia.
  */
-public final class ZelChatCross extends JavaPlugin {
+public final class ZelChatCross extends JavaPlugin implements Listener {
 
     private static ZelChatCross instance;
 
@@ -75,8 +79,10 @@ public final class ZelChatCross extends JavaPlugin {
         this.showcaseManager.start();
 
         // 5. Register Event Listeners
+        getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new PlayerConnectionListener(this), this);
         getServer().getPluginManager().registerEvents(new ShowcaseInventoryListener(), this);
+        getServer().getPluginManager().registerEvents(new PaperChatListener(this), this);
 
         // 6. Register Commands
         registerCommands();
@@ -144,6 +150,14 @@ public final class ZelChatCross extends JavaPlugin {
         }
     }
 
+    @EventHandler
+    public void onPluginEnable(PluginEnableEvent event) {
+        if (event.getPlugin().getName().equalsIgnoreCase("ZelChat")) {
+            getLogger().info("[ZelChat] ZelChat plugin enabled detected! Hooking ChatModule...");
+            registerZelChatModule();
+        }
+    }
+
     private void registerCommands() {
         registerCmd("zelcross", new ZelCrossCommand(this));
         registerCmd("msg", new GlobalMsgCommand(this));
@@ -169,19 +183,12 @@ public final class ZelChatCross extends JavaPlugin {
         }
     }
 
-    private void registerZelChatModule() {
-        try {
-            if (ZelChatAPI.get() != null) {
-                this.chatModule = new ZelCrossChatModule(this);
-                ZelChatAPI.get().getModuleManager().register(this, chatModule);
-                this.chatModule.load();
-                getLogger().info("[ZelChat] ZelCross ChatModule successfully hooked into ZelChat API.");
-                return;
-            }
-        } catch (Throwable ignored) {}
+    public void registerZelChatModule() {
+        if (chatModule != null) {
+            return;
+        }
 
-        // Retry hook after short delay to allow ZelChat initialization
-        scheduler.runAsyncDelayed(() -> {
+        scheduler.runGlobal(() -> {
             try {
                 if (ZelChatAPI.get() != null) {
                     this.chatModule = new ZelCrossChatModule(this);
@@ -190,9 +197,23 @@ public final class ZelChatCross extends JavaPlugin {
                     getLogger().info("[ZelChat] ZelCross ChatModule successfully hooked into ZelChat API.");
                 }
             } catch (Throwable t) {
-                getLogger().info("[ZelChat] Standalone mode: ZelChat API not detected (" + t.getMessage() + ").");
+                // If not yet available, schedule a delayed retry
+                scheduler.runAsyncDelayed(() -> {
+                    scheduler.runGlobal(() -> {
+                        try {
+                            if (chatModule == null && ZelChatAPI.get() != null) {
+                                this.chatModule = new ZelCrossChatModule(this);
+                                ZelChatAPI.get().getModuleManager().register(this, chatModule);
+                                this.chatModule.load();
+                                getLogger().info("[ZelChat] ZelCross ChatModule successfully hooked into ZelChat API.");
+                            }
+                        } catch (Throwable ignored) {
+                            getLogger().info("[ZelChat] Running with Paper native chat bridge (ZelChat module inactive).");
+                        }
+                    });
+                }, 1, TimeUnit.SECONDS);
             }
-        }, 1, TimeUnit.SECONDS);
+        });
     }
 
     private void unregisterZelChatModule() {
