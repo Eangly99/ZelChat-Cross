@@ -84,6 +84,7 @@ public final class ZelChatCross extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new ShowcaseInventoryListener(), this);
         getServer().getPluginManager().registerEvents(new PaperChatListener(this), this);
         getServer().getPluginManager().registerEvents(new dev.lyy.zelchatcross.listeners.PrivateMessageCommandListener(this), this);
+        getServer().getPluginManager().registerEvents(new dev.lyy.zelchatcross.listeners.NetworkTabCompleteListener(this), this);
 
         // 6. Register Commands
         registerCommands();
