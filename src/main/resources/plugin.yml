@@ -1,0 +1,93 @@
+name: ZelChat-Cross
+version: '${project.version}'
+main: dev.lyy.zelchatcross.ZelChatCross
+api-version: '1.21'
+folia-supported: true
+description: Powerful Redis-based cross-server expansion addon for ZelChat on Paper and Folia.
+author: lyy
+softdepend:
+  - ZelChat
+  - PlaceholderAPI
+
+commands:
+  zelcross:
+    description: Main admin command for ZelChat-Cross.
+    permission: zelcross.admin
+    aliases: [zelchatcross, zcross]
+    usage: /<command> [reload|info|servers|viewinv|viewec]
+  msg:
+    description: Send a private message to a player across the network.
+    permission: zelcross.msg
+    aliases: [tell, w, whisper, m, pm]
+    usage: /<command> <player> <message>
+  reply:
+    description: Reply to the last private message received.
+    permission: zelcross.reply
+    aliases: [r]
+    usage: /<command> <message>
+  gbroadcast:
+    description: Send a network-wide broadcast announcement.
+    permission: zelcross.admin.broadcast
+    aliases: [gannounce, galert]
+    usage: /<command> <message>
+  gchatmute:
+    description: Mute or unmute chat across all servers on the network.
+    permission: zelcross.admin.chatmute
+    aliases: [gmutenetwork, networkmute]
+    usage: /<command> [on|off]
+  gclearchat:
+    description: Clear chat on all servers across the network.
+    permission: zelcross.admin.clearchat
+    aliases: [networkclearchat, gchatclear]
+    usage: /<command>
+  gspy:
+    description: Toggle network-wide private message and staff chat spy mode.
+    permission: zelcross.admin.spy
+    aliases: [socialspy, crossspy]
+    usage: /<command>
+  gstaff:
+    description: Send a message to the network-wide staff chat channel.
+    permission: zelcross.staff.chat
+    aliases: [sc, staffchat, gsc]
+    usage: /<command> <message>
+
+permissions:
+  zelcross.admin:
+    description: Access to administrative commands of ZelCross.
+    default: op
+  zelcross.admin.reload:
+    description: Permission to reload ZelCross configuration.
+    default: op
+  zelcross.admin.broadcast:
+    description: Permission to send global broadcasts.
+    default: op
+  zelcross.admin.chatmute:
+    description: Permission to mute/unmute network chat.
+    default: op
+  zelcross.admin.clearchat:
+    description: Permission to clear chat across the network.
+    default: op
+  zelcross.admin.spy:
+    description: Permission to spy on private messages and staff chats.
+    default: op
+  zelcross.staff.chat:
+    description: Permission to view and send network staff chat messages.
+    default: op
+  zelcross.msg:
+    description: Permission to send cross-server private messages.
+    default: true
+  zelcross.reply:
+    description: Permission to reply to cross-server private messages.
+    default: true
+  zelcross.showcase.item:
+    description: Permission to showcase items in cross-server chat.
+    default: true
+  zelcross.showcase.inventory:
+    description: Permission to showcase inventory in cross-server chat.
+    default: true
+  zelcross.showcase.enderchest:
+    description: Permission to showcase enderchest in cross-server chat.
+    default: true
+  zelcross.showcase.view:
+    description: Permission to view showcased inventories and enderchests.
+    default: true

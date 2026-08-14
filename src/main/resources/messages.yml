@@ -1,0 +1,44 @@
+# ==============================================================================
+#                      ZelChat-Cross (ZelCross) Messages
+#                  Fully customizable with MiniMessage tags
+# ==============================================================================
+
+prefix: "<gradient:#00c6ff:#0072ff><bold>ZelCross</bold></gradient> <dark_gray>»</dark_gray> "
+
+no-permission: "<red>You don't have permission to execute this command.</red>"
+player-only: "<red>Only players can execute this command.</red>"
+player-not-found: "<red>Player <gold>{player}</gold> was not found online anywhere on the network.</red>"
+cannot-message-self: "<red>You cannot send a private message to yourself.</red>"
+no-reply-target: "<red>You have no one to reply to.</red>"
+target-pm-disabled: "<red><gold>{target}</gold> has private messages disabled.</red>"
+target-ignoring-you: "<red><gold>{target}</gold> is currently ignoring you.</red>"
+cannot-send-empty: "<red>You cannot send an empty message.</red>"
+
+# Showcase Messages
+showcase-cooldown: "<red>Please wait <gold>{seconds}</gold>s before showcasing another item or inventory.</red>"
+showcase-no-item: "<red>You are not holding any item to showcase.</red>"
+showcase-not-found: "<red>This snapshot expired or is no longer available.</red>"
+showcase-view-item-title: "<gradient:#00c6ff:#0072ff>{item_name}</gradient>"
+
+# Moderation Messages
+chat-muted-globally: "<red><bold>GLOBAL CHAT MUTED</bold></red> <gray>by <aqua>{sender}</aqua>. All server chats have been silenced.</gray>"
+chat-unmuted-globally: "<green><bold>GLOBAL CHAT UNMUTED</bold></green> <gray>by <aqua>{sender}</aqua>. You may now chat freely.</gray>"
+chat-cleared-globally: "<gold><bold>GLOBAL CHAT CLEARED</bold></gold> <gray>across all network servers by <aqua>{sender}</aqua>.</gray>"
+chat-is-muted: "<red>Global chat is currently muted by staff. You cannot send messages.</red>"
+
+# Spy Messages
+spy-enabled: "<green>Network SocialSpy has been <bold>ENABLED</bold>.</green>"
+spy-disabled: "<yellow>Network SocialSpy has been <bold>DISABLED</bold>.</yellow>"
+
+# Admin Commands
+reload-success: "<green>ZelChat-Cross configuration and Redis connections reloaded successfully!</green>"
+server-list-header: "<gradient:#00c6ff:#0072ff><bold>Network Servers &amp; Presence</bold></gradient> <dark_gray>({count} online players)</dark_gray>"
+server-list-entry: "<gray>• <yellow>{server}</yellow> <dark_gray>(</dark_gray><green>{players} players</green><dark_gray>)</dark_gray></gray>"
+info-message:
+  - "<dark_gray>--------------------------------------------------</dark_gray>"
+  - "<gradient:#00c6ff:#0072ff><bold>ZelChat-Cross</bold></gradient> <gray>v{version} by lyy</gray>"
+  - "<gray>Status: <green>Connected to Redis</green></gray>"
+  - "<gray>Server ID: <yellow>{server_id}</yellow></gray>"
+  - "<gray>Network Players: <aqua>{network_players}</aqua></gray>"
+  - "<gray>Connected Servers: <gold>{server_count}</gold></gray>"
+  - "<dark_gray>--------------------------------------------------</dark_gray>"

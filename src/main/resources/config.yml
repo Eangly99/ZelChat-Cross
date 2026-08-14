@@ -1,0 +1,103 @@
+# ==============================================================================
+#                      ZelChat-Cross (ZelCross) Configuration
+#             Enterprise Redis Cross-Server Bridge for ZelChat
+# ==============================================================================
+
+# Unique identifier for this server instance in the network.
+# Examples: "lobby-1", "survival-1", "skyblock-1"
+server-id: "survival-1"
+
+# Pretty display name formatted in MiniMessage for chat and tooltips.
+server-display-name: "<gradient:#00ff87:#60efff>Survival</gradient>"
+
+# Redis / DragonflyDB Connection Settings
+redis:
+  host: "127.0.0.1"
+  port: 6379
+  username: "" # Optional for Redis 6+ ACL or DragonflyDB
+  password: "" # Leave empty if no password is set
+  database: 0
+  ssl: false
+  timeout-ms: 5000
+  channel-prefix: "zelcross"
+  pool:
+    max-total: 32
+    max-idle: 16
+    min-idle: 4
+    test-on-borrow: true
+    test-while-idle: true
+
+# Global Chat Synchronization
+channels:
+  # Whether to synchronize public chat across all network instances
+  sync-public: true
+  # Whether to synchronize staff chat across all network instances
+  sync-staff: true
+  # Format wrapper for cross-server incoming public messages
+  # Placeholders: <origin_server>, <origin_server_display>, <sender>, <message>
+  public-incoming-prefix: "<dark_gray>[<aqua><origin_server_display></aqua>]</dark_gray> "
+  # Format wrapper for cross-server incoming staff messages
+  staff-incoming-prefix: "<red>[STAFF]</red> <dark_gray>[<yellow><origin_server_display></yellow>]</dark_gray> "
+
+# Interactive Item & Inventory Showcasing
+showcase:
+  enabled: true
+  cooldown-seconds: 3
+
+  # Held Item Showcasing
+  item:
+    enabled: true
+    placeholders:
+      - "[item]"
+      - "[i]"
+      - "[hand]"
+    # MiniMessage format for the showcase link in chat
+    # Placeholders: {item_name}, {item_count}, {item_type}
+    format: "<hover:show_text:'<gray>Inspect <aqua>{item_name}</aqua> <dark_gray>(x{item_count})</dark_gray></gray><newline><dark_gray>Click to view details</dark_gray>'><click:run_command:'/zelcross viewitem {snapshot_id}'><dark_gray>[<aqua>{item_name} <gray>x{item_count}</gray></aqua>]</dark_gray></click></hover>"
+    air-format: "<dark_gray>[<gray>Air</gray>]</dark_gray>"
+
+  # Player Inventory Showcasing
+  inventory:
+    enabled: true
+    placeholders:
+      - "[inv]"
+      - "[inventory]"
+    # Clickable tag opening a virtual read-only GUI snapshot
+    format: "<hover:show_text:'<gray>Click to view <aqua>{player}</aqua> Inventory</gray>'><click:run_command:'/zelcross viewinv {snapshot_id}'><gold>[Inventory]</gold></click></hover>"
+    gui-title: "<dark_gray>{player}'s Inventory Snapshot</dark_gray>"
+    # Snapshot TTL in Redis (seconds)
+    snapshot-ttl-seconds: 300
+
+  # Player Ender Chest Showcasing
+  enderchest:
+    enabled: true
+    placeholders:
+      - "[ec]"
+      - "[enderchest]"
+      - "[echest]"
+    # Clickable tag opening a virtual read-only GUI snapshot
+    format: "<hover:show_text:'<gray>Click to view <aqua>{player}</aqua> Ender Chest</gray>'><click:run_command:'/zelcross viewec {snapshot_id}'><light_purple>[Ender Chest]</light_purple></click></hover>"
+    gui-title: "<dark_purple>{player}'s Ender Chest Snapshot</dark_purple>"
+    # Snapshot TTL in Redis (seconds)
+    snapshot-ttl-seconds: 300
+
+# Advanced Cross-Server Private Messaging (/msg, /tell, /r)
+private-messaging:
+  enabled: true
+  format-send: "<gray>[<gold>You</gold> <dark_gray>→</dark_gray> <aqua><target></aqua> <dark_gray>(<yellow><target_server_display></yellow>)</dark_gray>]</gray> <white><message></white>"
+  format-receive: "<gray>[<aqua><sender></aqua> <dark_gray>(<yellow><sender_server_display></yellow>)</dark_gray> <dark_gray>→</dark_gray> <gold>You</gold>]</gray> <white><message></white>"
+  format-spy: "<dark_gray>[SPY]</dark_gray> <gray>[<aqua><sender></aqua> <dark_gray>(<yellow><sender_server_display></yellow>)</dark_gray> <dark_gray>→</dark_gray> <gold><target></gold> <dark_gray>(<yellow><target_server_display></yellow>)</dark_gray>]</gray> <white><message></white>"
+
+# Network Presence & Tab-Completion
+presence:
+  heartbeat-interval-seconds: 10
+  server-timeout-seconds: 30
+  enable-network-tab-complete: true
+
+# Network Moderation Settings
+moderation:
+  broadcast-prefix: "<gradient:#ff512f:#dd2476><bold>NETWORK BROADCAST</bold></gradient> <dark_gray>»</dark_gray> "
+  broadcast-sound: "ENTITY_PLAYER_LEVELUP"
+  broadcast-sound-volume: 1.0
+  broadcast-sound-pitch: 1.0
+  staffchat-prefix: "<red>[STAFF]</red> <dark_gray>[<yellow><origin_server_display></yellow>]</dark_gray> <aqua><sender></aqua><dark_gray>:</dark_gray> "
