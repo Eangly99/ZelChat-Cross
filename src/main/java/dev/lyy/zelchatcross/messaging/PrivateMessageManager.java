@@ -124,6 +124,11 @@ public final class PrivateMessageManager {
                     processedMessage
             );
             plugin.getRedisManager().getPublisher().publishPrivateMessage(payload);
+
+            if (plugin.getConfigManager().isDebug()) {
+                plugin.getLogger().info("[Debug] Published cross-server PM from " + sender.getName()
+                        + " (" + currentServerId + ") to " + target.getUsername() + " (" + target.getServerId() + ")");
+            }
         }
 
         // Dispatch SocialSpy
@@ -197,6 +202,11 @@ public final class PrivateMessageManager {
         // Update recipient's replier target
         lastReplierUuid.put(localTarget.getUniqueId(), payload.getSenderUuid());
         lastReplierName.put(localTarget.getUniqueId(), payload.getSenderName());
+
+        if (plugin.getConfigManager().isDebug()) {
+            plugin.getLogger().info("[Debug] Delivered cross-server PM to " + localTarget.getName()
+                    + " from " + payload.getSenderName() + " (" + payload.getOriginServerId() + ")");
+        }
     }
 
     public void handleIncomingSpyMessage(SocialSpyPayload payload) {

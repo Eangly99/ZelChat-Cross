@@ -1,5 +1,6 @@
 package dev.lyy.zelchatcross.redis.payload;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -12,27 +13,28 @@ public final class PresencePayload extends RedisPayload {
         PLAYER_JOIN,
         PLAYER_QUIT,
         SERVER_HEARTBEAT,
-        SERVER_STOP
+        SERVER_STOP,
+        SYNC_REQUEST
     }
 
     private final Type type;
     private final String serverDisplayName;
     private final UUID singlePlayerUuid;
     private final String singlePlayerName;
-    private final Map<UUID, String> onlinePlayers; // Used for HEARTBEAT snapshot
+    private final Map<String, String> onlinePlayers; // Map of String UUID -> PlayerName for robust JSON serialization
 
     public PresencePayload(String originServerId,
                            String serverDisplayName,
                            Type type,
                            UUID singlePlayerUuid,
                            String singlePlayerName,
-                           Map<UUID, String> onlinePlayers) {
+                           Map<String, String> onlinePlayers) {
         super(originServerId);
         this.serverDisplayName = serverDisplayName;
         this.type = type;
         this.singlePlayerUuid = singlePlayerUuid;
         this.singlePlayerName = singlePlayerName;
-        this.onlinePlayers = onlinePlayers != null ? Map.copyOf(onlinePlayers) : Map.of();
+        this.onlinePlayers = onlinePlayers != null ? new HashMap<>(onlinePlayers) : new HashMap<>();
     }
 
     public Type getType() {
@@ -51,7 +53,7 @@ public final class PresencePayload extends RedisPayload {
         return singlePlayerName;
     }
 
-    public Map<UUID, String> getOnlinePlayers() {
+    public Map<String, String> getOnlinePlayers() {
         return onlinePlayers;
     }
 

@@ -80,7 +80,7 @@ class RedisPayloadTest {
     void testPresencePayload() {
         UUID player1 = UUID.randomUUID();
         UUID player2 = UUID.randomUUID();
-        Map<UUID, String> players = Map.of(player1, "Alpha", player2, "Beta");
+        Map<String, String> players = Map.of(player1.toString(), "Alpha", player2.toString(), "Beta");
 
         PresencePayload original = new PresencePayload(
                 "survival-2",
@@ -98,8 +98,8 @@ class RedisPayloadTest {
         assertEquals(PresencePayload.Type.SERVER_HEARTBEAT, deserialized.getType());
         assertEquals("survival-2", deserialized.getOriginServerId());
         assertEquals(2, deserialized.getOnlinePlayers().size());
-        assertEquals("Alpha", deserialized.getOnlinePlayers().get(player1));
-        assertEquals("Beta", deserialized.getOnlinePlayers().get(player2));
+        assertEquals("Alpha", deserialized.getOnlinePlayers().get(player1.toString()));
+        assertEquals("Beta", deserialized.getOnlinePlayers().get(player2.toString()));
     }
 
     @Test

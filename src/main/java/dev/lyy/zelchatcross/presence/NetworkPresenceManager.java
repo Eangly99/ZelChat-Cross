@@ -14,7 +14,7 @@ import java.util.logging.Level;
 
 /**
  * Manages distributed player presence caching across all servers.
- * Features zero-allocation player name tab-completion and cross-server switch consistency.
+ * Features zero-allocation player name tab-completion, instant boot sync, and server-switch consistency.
  */
 public final class NetworkPresenceManager {
 
@@ -48,8 +48,10 @@ public final class NetworkPresenceManager {
         }
         updateCachedPlayerNames();
 
-        // Send initial heartbeat and start recurring task
+        // Send initial heartbeat and broadcast sync request to all other servers
         sendHeartbeat();
+        requestNetworkSync();
+
         this.heartbeatTask = plugin.getScheduler().runAsyncRepeating(
                 this::sendHeartbeat,
                 interval,
@@ -95,6 +97,19 @@ public final class NetworkPresenceManager {
         cachedPlayerNames = Collections.emptyList();
     }
 
+    public void requestNetworkSync() {
+        String serverId = plugin.getConfigManager().getServerId();
+        PresencePayload syncRequest = new PresencePayload(
+                serverId,
+                plugin.getConfigManager().getServerDisplayName(),
+                PresencePayload.Type.SYNC_REQUEST,
+                null,
+                null,
+                null
+        );
+        plugin.getRedisManager().getPublisher().publishPresence(syncRequest);
+    }
+
     public void onLocalPlayerJoin(Player player) {
         registerLocalPlayer(player);
         updateCachedPlayerNames();
@@ -111,6 +126,10 @@ public final class NetworkPresenceManager {
                 null
         );
         plugin.getRedisManager().getPublisher().publishPresence(payload);
+
+        if (plugin.getConfigManager().isDebug()) {
+            plugin.getLogger().info("[Debug] Published PLAYER_JOIN for " + player.getName() + " on " + serverId);
+        }
     }
 
     public void onLocalPlayerQuit(Player player) {
@@ -129,6 +148,10 @@ public final class NetworkPresenceManager {
                 null
         );
         plugin.getRedisManager().getPublisher().publishPresence(payload);
+
+        if (plugin.getConfigManager().isDebug()) {
+            plugin.getLogger().info("[Debug] Published PLAYER_QUIT for " + player.getName() + " on " + serverId);
+        }
     }
 
     private void registerLocalPlayer(Player player) {
@@ -156,14 +179,14 @@ public final class NetworkPresenceManager {
         }
     }
 
-    private void sendHeartbeat() {
+    public void sendHeartbeat() {
         try {
             String serverId = plugin.getConfigManager().getServerId();
             String serverDisplay = plugin.getConfigManager().getServerDisplayName();
 
-            Map<UUID, String> localPlayers = new HashMap<>();
+            Map<String, String> localPlayers = new HashMap<>();
             for (Player p : Bukkit.getOnlinePlayers()) {
-                localPlayers.put(p.getUniqueId(), p.getName());
+                localPlayers.put(p.getUniqueId().toString(), p.getName());
             }
 
             PresencePayload payload = new PresencePayload(
@@ -204,6 +227,10 @@ public final class NetworkPresenceManager {
         serverHeartbeats.put(originServer, System.currentTimeMillis());
 
         switch (payload.getType()) {
+            case SYNC_REQUEST -> {
+                // Reply immediately with local heartbeat so the newly started server gets our players right away
+                sendHeartbeat();
+            }
             case PLAYER_JOIN -> {
                 if (payload.getSinglePlayerUuid() != null && payload.getSinglePlayerName() != null) {
                     UUID uuid = payload.getSinglePlayerUuid();
@@ -224,6 +251,10 @@ public final class NetworkPresenceManager {
                     uuidByName.put(payload.getSinglePlayerName().toLowerCase(Locale.ROOT), uuid);
                     playersByServer.computeIfAbsent(originServer, k -> ConcurrentHashMap.newKeySet()).add(uuid);
                     updateCachedPlayerNames();
+
+                    if (plugin.getConfigManager().isDebug()) {
+                        plugin.getLogger().info("[Debug] Network presence registered: " + payload.getSinglePlayerName() + " on " + originServer);
+                    }
                 }
             }
             case PLAYER_QUIT -> {
@@ -241,16 +272,29 @@ public final class NetworkPresenceManager {
                         set.remove(uuid);
                     }
                     updateCachedPlayerNames();
+
+                    if (plugin.getConfigManager().isDebug()) {
+                        plugin.getLogger().info("[Debug] Network presence unregistered: " + payload.getSinglePlayerName() + " on " + originServer);
+                    }
                 }
             }
             case SERVER_HEARTBEAT -> {
-                Map<UUID, String> remotePlayers = payload.getOnlinePlayers();
+                Map<String, String> remotePlayers = payload.getOnlinePlayers();
                 Set<UUID> currentServerUuids = playersByServer.computeIfAbsent(originServer, k -> ConcurrentHashMap.newKeySet());
+
+                Set<UUID> remoteUuids = new HashSet<>();
+                if (remotePlayers != null) {
+                    for (String uuidStr : remotePlayers.keySet()) {
+                        try {
+                            remoteUuids.add(UUID.fromString(uuidStr));
+                        } catch (Exception ignored) {}
+                    }
+                }
 
                 // Remove players no longer present on that server only if their current registered server is originServer
                 Set<UUID> toRemove = new HashSet<>();
                 for (UUID u : currentServerUuids) {
-                    if (remotePlayers == null || !remotePlayers.containsKey(u)) {
+                    if (!remoteUuids.contains(u)) {
                         toRemove.add(u);
                     }
                 }
@@ -265,16 +309,22 @@ public final class NetworkPresenceManager {
 
                 // Add or update current players
                 if (remotePlayers != null) {
-                    for (Map.Entry<UUID, String> entry : remotePlayers.entrySet()) {
-                        UUID uuid = entry.getKey();
-                        String name = entry.getValue();
-                        NetworkPlayer netPlayer = new NetworkPlayer(uuid, name, originServer, serverDisplay);
-                        playersByUuid.put(uuid, netPlayer);
-                        uuidByName.put(name.toLowerCase(Locale.ROOT), uuid);
-                        currentServerUuids.add(uuid);
+                    for (Map.Entry<String, String> entry : remotePlayers.entrySet()) {
+                        try {
+                            UUID uuid = UUID.fromString(entry.getKey());
+                            String name = entry.getValue();
+                            NetworkPlayer netPlayer = new NetworkPlayer(uuid, name, originServer, serverDisplay);
+                            playersByUuid.put(uuid, netPlayer);
+                            uuidByName.put(name.toLowerCase(Locale.ROOT), uuid);
+                            currentServerUuids.add(uuid);
+                        } catch (Exception ignored) {}
                     }
                 }
                 updateCachedPlayerNames();
+
+                if (plugin.getConfigManager().isDebug()) {
+                    plugin.getLogger().info("[Debug] Updated heartbeat from " + originServer + " (" + remoteUuids.size() + " players)");
+                }
             }
             case SERVER_STOP -> {
                 removeServer(originServer);
@@ -329,10 +379,19 @@ public final class NetworkPresenceManager {
     }
 
     public NetworkPlayer getPlayerByName(String name) {
-        if (name == null) return null;
+        if (name == null || name.isEmpty()) return null;
         UUID uuid = uuidByName.get(name.toLowerCase(Locale.ROOT));
-        if (uuid == null) return null;
-        return playersByUuid.get(uuid);
+        if (uuid != null) {
+            NetworkPlayer player = playersByUuid.get(uuid);
+            if (player != null) return player;
+        }
+        // Fallback case-insensitive scan
+        for (NetworkPlayer p : playersByUuid.values()) {
+            if (p.getUsername().equalsIgnoreCase(name)) {
+                return p;
+            }
+        }
+        return null;
     }
 
     public NetworkPlayer getPlayerByUuid(UUID uuid) {
